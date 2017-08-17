@@ -16,6 +16,7 @@ import argparse
 import getpass
 import ssl
 import os
+from terminaltables import AsciiTable
 
 try:
     import json
@@ -72,6 +73,14 @@ def get_obj(content, vimtype):
     obj = containers.view
     return obj
 
+def print_vm_info(summary_vm):
+    table_data = []
+    table_data.append(['IP Address','Annotation'])
+    table_data.append([summary_vm.guest.ipAddress, summary_vm.config.annotation])
+    table = AsciiTable(table_data)
+    table.title = 'VM Name: ' + summary_vm.config.name
+    print '\n' + table.table
+
 
 def grouplist(si):
     inventory = {}
@@ -79,14 +88,11 @@ def grouplist(si):
     content = si.RetrieveContent()
     virtual_machines = get_obj(content, [vim.VirtualMachine])
 
-    for child in content.rootFolder.childEntity:
-        if hasattr(child, 'vmFolder'):
-            datacenter = child
-            vmFolder = datacenter.vmFolder
-            print datacenter.vmFolder
-            vmList = vmFolder.childEntity
-            for folder in vmFolder.childEntity:
-                print 'Folder: ', folder.childType
+    for vm in virtual_machines:
+        summary_vm = vm.summary
+        if (not summary_vm.config.template) and (summary_vm.config.annotation != "") and (summary_vm.runtime.powerState == "poweredOn"):
+            print_vm_info(summary_vm)
+
     # print json.dumps(inventory, indent=4)aa
 
 
