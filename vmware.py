@@ -125,9 +125,9 @@ def main():
 
     if args.list:
         service_instance = open_connection(args)
-        
         content = service_instance.RetrieveContent()
         virtual_machines = get_obj(content, [vim.VirtualMachine])
+        close_connection(service_instance, args)
 
         for vm in virtual_machines:
             summary_vm = vm.summary
