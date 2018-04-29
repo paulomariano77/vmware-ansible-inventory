@@ -58,6 +58,11 @@ def get_args():
                         default=True,
                         action='store_true',
                         help='List instances (default: True)')
+
+    parser.add_argument('--usetags',
+                        default=False,
+                        action='store_true',
+                        help='Get only hosts with \'#\' at beggining of annotation')
     
     args = parser.parse_args()
 
@@ -91,29 +96,40 @@ def get_obj(content, vimtype):
     return obj
 
 
-def print_vm_info(summary_vm):
-    table_data = []
-    table_data.append(['VM Name:', summary_vm.config.name])
-    table_data.append(['IP Address:', summary_vm.guest.ipAddress])
-    table_data.append(['Annotation:', summary_vm.config.annotation])
-    table = SingleTable(table_data)
-    table.inner_row_border = True
-    print table.table
+def print_vm_info(summary_vm, usetags):
+    if summary_vm.config.annotation != "":
+        table_data = []
+        table_data.append(['VM Name:', summary_vm.config.name])
+        table_data.append(['IP Address:', summary_vm.guest.ipAddress])
+        table_data.append(['Annotation:', summary_vm.config.annotation])
+        table = SingleTable(table_data)
+        table.inner_row_border = True
+        print table.table
 
 
-def create_inventory(summary_vm, inventory):
-    tags = re.findall(r'#(\w+)', summary_vm.config.annotation)
-    for tag in tags:
-        if tag in inventory:
-            vm_hosts = inventory[tag].get('hosts')
-            vm_hosts.append(summary_vm.config.name)
-            inventory[tag]['hosts'] = vm_hosts
-        else:
-            inventory[tag] = {}
-            inventory[tag]['hosts'] = [summary_vm.config.name]
-        
-        inventory['_meta']['hostvars'][summary_vm.config.name] = { "ansible_host": summary_vm.guest.ipAddress }
+def create_inventory(summary_vm, inventory, usetags):
+    if usetags:
+        create_inventory_with_tags(summary_vm, inventory)
+    else:
+        create_inventory_without_tags(summary_vm, inventory)
 
+def create_inventory_with_tags(summary_vm, inventory):
+    if (summary_vm.config.annotation != ""):
+        tags = re.findall(r'#(\w+)', summary_vm.config.annotation)
+        for tag in tags:
+            if tag in inventory:
+                vm_hosts = inventory[tag].get('hosts')
+                vm_hosts.append(summary_vm.config.name)
+                inventory[tag]['hosts'] = vm_hosts
+            else:
+                inventory[tag] = {}
+                inventory[tag]['hosts'] = [summary_vm.config.name]
+            
+            inventory['_meta']['hostvars'][summary_vm.config.name] = { "ansible_host": summary_vm.guest.ipAddress }
+
+def create_inventory_without_tags(summary_vm, inventory):
+    for vm in summary_vm.guest.ipAddress:
+        inventory['_meta']['hostvars'][summary_vm.config.name] = { "ansible_host": summary_vm.guest.ipAddress }  
 
 def main():
     inventory = {}
@@ -121,9 +137,10 @@ def main():
     inventory['_meta']['hostvars'] = {}
     inventory['local'] = ['127.0.0.1']
 
-    args = get_args()
+    args = get_args()    
 
     if args.list:
+        usetags = args.usetags
         service_instance = open_connection(args)
         content = service_instance.RetrieveContent()
         virtual_machines = get_obj(content, [vim.VirtualMachine])
@@ -131,16 +148,14 @@ def main():
 
         for vm in virtual_machines:
             summary_vm = vm.summary
-            if ((not summary_vm.config.template) and (summary_vm.config.annotation != "") and 
-                (summary_vm.runtime.powerState == "poweredOn") and (summary_vm.guest.ipAddress is not None)):
-                    
-                    if args.debug:
-                        print_vm_info(summary_vm)
-                    
-                    create_inventory(summary_vm, inventory)
-        
-                
 
+            if ((not summary_vm.config.template) and (summary_vm.runtime.powerState == "poweredOn")
+                and (summary_vm.guest.ipAddress is not None)):                    
+                if args.debug:
+                    print_vm_info(summary_vm, usetags)
+                
+                create_inventory(summary_vm, inventory, usetags)
+                
     print json.dumps(inventory, indent=4)
 
 
