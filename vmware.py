@@ -3,7 +3,7 @@
 """
 Written by Paulo Mariano
 Github: https://github.com/paulomariano77
-Email: pazevedo@stone.com.br
+Email: paulomariano77@gmail.com
 
 This script generates a ansible dynamic inventory for VMWare vCenter
 """
